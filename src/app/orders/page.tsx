@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Order, OrderStatus, PaymentStatus } from '../utils/orderService';
-import { isAuthenticated, getCurrentUser } from '../utils/authService';
+
+// Add dynamic export
+export const dynamic = 'force-dynamic';
 
 // In a real app, this would be fetched from an API
 const mockOrders: Order[] = [
@@ -36,26 +38,56 @@ const mockOrders: Order[] = [
   }
 ];
 
-export default function OrdersPage() {
+function OrdersContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const user = getCurrentUser();
+  const [user, setUser] = useState<{ name: string } | null>(null);
+  const [isAuth, setIsAuth] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push('/login');
-      return;
-    }
+    // Check authentication on client side
+    const checkAuth = () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          router.push('/login');
+          return false;
+        }
 
-    // Simulate API call
-    const fetchOrders = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setOrders(mockOrders);
-      setLoading(false);
+        // Decode JWT token to get user info
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+
+        const { userId, email } = JSON.parse(jsonPayload);
+        setUser({ name: email.split('@')[0] }); // Simple name from email
+        return true;
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        router.push('/login');
+        return false;
+      }
     };
 
-    fetchOrders();
+    const isAuthenticated = checkAuth();
+    setIsAuth(isAuthenticated);
+
+    if (isAuthenticated) {
+      // Simulate API call
+      const fetchOrders = async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setOrders(mockOrders);
+        setLoading(false);
+      };
+
+      fetchOrders();
+    }
   }, [router]);
 
   const getStatusColor = (status: OrderStatus) => {
@@ -72,6 +104,10 @@ export default function OrdersPage() {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (!isAuth) {
+    return null; // Let the router handle redirection
+  }
 
   if (loading) {
     return (
@@ -171,5 +207,19 @@ export default function OrdersPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center">
+          <p className="text-gray-600">Loading orders...</p>
+        </div>
+      </div>
+    }>
+      <OrdersContent />
+    </Suspense>
   );
 } 

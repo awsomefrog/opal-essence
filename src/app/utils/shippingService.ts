@@ -11,13 +11,16 @@ interface Location {
 
 // Shipping zones based on distance from Newberg, OR (97132)
 const SHIPPING_ZONES = {
-  ZONE1: ['OR', 'WA', 'ID'], // Closest states
-  ZONE2: ['CA', 'NV', 'MT', 'WY'], // Medium distance
-  ZONE3: ['AZ', 'UT', 'NM', 'CO'], // Further
+  ZONE1: ['OR', 'WA', 'ID'],
+  ZONE2: ['CA', 'NV', 'MT', 'WY'],
+  ZONE3: ['AZ', 'UT', 'NM', 'CO'],
   // Add more zones as needed
 };
 
-const BASE_RATES = {
+type ShippingZone = keyof typeof SHIPPING_ZONES | 'DEFAULT';
+type ShippingMethod = 'ground' | 'twoDay' | 'overnight';
+
+const BASE_RATES: Record<ShippingMethod, Record<ShippingZone, number>> = {
   ground: {
     ZONE1: 15,
     ZONE2: 20,
@@ -38,7 +41,7 @@ const BASE_RATES = {
   },
 };
 
-const ESTIMATED_DAYS = {
+const ESTIMATED_DAYS: Record<ShippingMethod, Record<ShippingZone, string>> = {
   ground: {
     ZONE1: '2-3',
     ZONE2: '3-5',
@@ -59,10 +62,14 @@ const ESTIMATED_DAYS = {
   },
 };
 
-function getShippingZone(state: string): string {
-  if (SHIPPING_ZONES.ZONE1.includes(state)) return 'ZONE1';
-  if (SHIPPING_ZONES.ZONE2.includes(state)) return 'ZONE2';
-  if (SHIPPING_ZONES.ZONE3.includes(state)) return 'ZONE3';
+function getShippingZone(state: string): ShippingZone {
+  const zone1States = new Set(SHIPPING_ZONES.ZONE1);
+  const zone2States = new Set(SHIPPING_ZONES.ZONE2);
+  const zone3States = new Set(SHIPPING_ZONES.ZONE3);
+
+  if (zone1States.has(state)) return 'ZONE1';
+  if (zone2States.has(state)) return 'ZONE2';
+  if (zone3States.has(state)) return 'ZONE3';
   return 'DEFAULT';
 }
 
@@ -83,7 +90,7 @@ export async function calculateShippingRates(
   const FREE_SHIPPING_THRESHOLD = 150;
   const isEligibleForFreeShipping = orderSubtotal >= FREE_SHIPPING_THRESHOLD;
 
-  const methods = ['ground', 'twoDay', 'overnight'] as const;
+  const methods: ShippingMethod[] = ['ground', 'twoDay', 'overnight'];
   
   return methods.map(method => {
     const baseRate = BASE_RATES[method][zone];

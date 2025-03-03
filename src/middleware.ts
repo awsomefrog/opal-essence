@@ -1,100 +1,83 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { generateCSRFToken, validateCSRFToken } from './app/utils/authService';
+import { generateCSRFToken, validateCSRFToken } from './app/utils/csrfUtils';
 
 // Rate limiting configuration
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 100; // Maximum requests per window
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS = 100;
 
-// Store rate limiting data (in a real app, use Redis)
+// Store rate limit data in memory (in production, use Redis or similar)
 const rateLimitStore = new Map<string, { count: number; timestamp: number }>();
 
-// Protected routes that require CSRF token
-const protectedRoutes = [
-  '/api/login',
-  '/api/register',
-  '/api/reset-password',
-  '/api/forgot-password'
-];
-
-// Clean up expired rate limit entries
-function cleanupRateLimitStore() {
+// Clean up expired entries every minute
+setInterval(() => {
   const now = Date.now();
-  for (const [key, data] of rateLimitStore.entries()) {
-    if (now - data.timestamp > RATE_LIMIT_WINDOW) {
+  Array.from(rateLimitStore.entries()).forEach(([key, value]) => {
+    if (now - value.timestamp > RATE_LIMIT_WINDOW) {
       rateLimitStore.delete(key);
     }
-  }
-}
+  });
+}, RATE_LIMIT_WINDOW);
 
-// Check rate limit for an IP
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const data = rateLimitStore.get(ip);
-
-  if (!data) {
-    rateLimitStore.set(ip, { count: 1, timestamp: now });
-    return true;
-  }
-
-  if (now - data.timestamp > RATE_LIMIT_WINDOW) {
-    rateLimitStore.set(ip, { count: 1, timestamp: now });
-    return true;
-  }
-
-  if (data.count >= MAX_REQUESTS) {
-    return false;
-  }
-
-  data.count += 1;
-  return true;
-}
+// Routes that require CSRF protection
+const protectedRoutes = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/reset-password',
+  '/api/checkout',
+  '/api/orders',
+];
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
-  // Get client IP
-  const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-
-  // Clean up expired rate limit entries periodically
-  if (Math.random() < 0.1) { // 10% chance to trigger cleanup
-    cleanupRateLimitStore();
-  }
-
-  // Check rate limit
-  if (!checkRateLimit(ip)) {
-    return new NextResponse(
-      JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Handle CSRF protection for protected routes
-  if (protectedRoutes.includes(request.nextUrl.pathname)) {
-    const csrfToken = request.headers.get('X-CSRF-Token');
-
-    // For GET requests, generate and set CSRF token
-    if (request.method === 'GET') {
-      const token = generateCSRFToken();
-      response.headers.set('X-CSRF-Token', token);
-    }
-    // For other methods, validate CSRF token
-    else if (!csrfToken || !validateCSRFToken(csrfToken)) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Invalid CSRF token' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-  }
-
-  // Set security headers
+  // Add security headers
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
   );
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+
+  // Check rate limit
+  const ip = request.ip || 'unknown';
+  const rateLimit = rateLimitStore.get(ip) || { count: 0, timestamp: Date.now() };
+
+  if (Date.now() - rateLimit.timestamp > RATE_LIMIT_WINDOW) {
+    // Reset if window has passed
+    rateLimit.count = 1;
+    rateLimit.timestamp = Date.now();
+  } else {
+    rateLimit.count++;
+    if (rateLimit.count > MAX_REQUESTS) {
+      return new NextResponse('Too Many Requests', { status: 429 });
+    }
+  }
+  rateLimitStore.set(ip, rateLimit);
+
+  // CSRF protection for protected routes
+  const path = request.nextUrl.pathname;
+  if (protectedRoutes.some(route => path.startsWith(route))) {
+    if (request.method === 'GET') {
+      // For GET requests, set a new CSRF token
+      const csrfToken = generateCSRFToken();
+      response.cookies.set('CSRF-Token', csrfToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+    } else {
+      // For non-GET requests, validate the token
+      const csrfToken = request.headers.get('X-CSRF-Token');
+      const storedToken = request.cookies.get('CSRF-Token')?.value;
+
+      if (!csrfToken || !storedToken || !validateCSRFToken(csrfToken) || csrfToken !== storedToken) {
+        return new NextResponse('Invalid CSRF Token', { status: 403 });
+      }
+    }
+  }
 
   return response;
 }
