@@ -1,3 +1,5 @@
+'use client';
+
 import { createHash, randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
@@ -18,7 +20,11 @@ interface User {
 
 interface AuthResponse {
   success: boolean;
-  user?: Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'>;
+  error?: string;
+  token?: string;
+}
+
+interface LoginResponse {
   token?: string;
   error?: string;
 }
@@ -174,61 +180,35 @@ export async function register(
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  // Check rate limiting
-  if (!checkRateLimit(email)) {
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Login failed');
+    }
+
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+    }
+
+    return {
+      success: true,
+      token: data.token,
+    };
+  } catch (error) {
     return {
       success: false,
-      error: 'Too many login attempts. Please try again later.'
+      error: error instanceof Error ? error.message : 'An error occurred during login',
     };
   }
-
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  const user = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-  
-  if (!user) {
-    return {
-      success: false,
-      error: 'Invalid email or password'
-    };
-  }
-
-  if (!user.isVerified) {
-    return {
-      success: false,
-      error: 'Please verify your email address before logging in'
-    };
-  }
-
-  // In a real app, we would use the stored salt
-  const hashedPassword = hashPassword(password, 'initial-salt');
-  if (hashedPassword !== user.password) {
-    return {
-      success: false,
-      error: 'Invalid email or password'
-    };
-  }
-
-  // Clear login attempts on successful login
-  loginAttempts.delete(email);
-
-  // Create JWT token
-  const token = createJWT(user);
-  
-  // Store token in localStorage
-  localStorage.setItem('token', token);
-  
-  return {
-    success: true,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      isVerified: user.isVerified
-    },
-    token
-  };
 }
 
 export function logout(): void {
@@ -260,7 +240,11 @@ export function getCurrentUser(): Omit<User, 'password'> | null {
 }
 
 export function isAuthenticated(): boolean {
-  return getCurrentUser() !== null;
+  return !!localStorage.getItem('token');
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem('token');
 }
 
 export async function verifyEmail(token: string): Promise<boolean> {
