@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { Inter } from 'next/font/google';
 import { CartProvider } from './context/CartContext';
 import CartCount from './components/CartCount';
