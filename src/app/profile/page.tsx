@@ -37,7 +37,7 @@ export default function ProfilePage() {
         <div className="bg-accent-light rounded-lg shadow-sm border border-primary-200 overflow-hidden">
           <div className="px-6 py-8">
             <div className="flex items-center justify-between mb-8">
-              <h1 className="text-3xl font-bold text-primary-900">Profile</h1>
+              <h1 className="text-3xl font-bold text-primary-900">My Account</h1>
               <Link
                 href="/profile/settings"
                 className="text-primary-600 hover:text-primary-900 transition-colors px-4 py-2 rounded-md border border-primary-200 hover:border-primary-300"
@@ -46,54 +46,49 @@ export default function ProfilePage() {
               </Link>
             </div>
 
-            <div className="space-y-6">
-              <div>
+            <div className="space-y-8">
+              {/* Account Information */}
+              <section>
                 <h2 className="text-xl font-semibold text-primary-900 mb-4">Account Information</h2>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-primary-600">Name</label>
-                    <p className="mt-1 text-primary-900">{user.name}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-primary-600">Email</label>
-                    <p className="mt-1 text-primary-900">{user.email}</p>
-                  </div>
+                <div className="bg-white p-4 rounded-md border border-primary-200">
+                  <p className="text-primary-600">Email: {user.email}</p>
                 </div>
-              </div>
+              </section>
 
-              <div>
+              {/* Quick Links */}
+              <section>
                 <h2 className="text-xl font-semibold text-primary-900 mb-4">Quick Links</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Link
-                    href="/profile/orders"
-                    className="block text-primary-600 hover:text-primary-900 transition-colors p-4 rounded-md border border-primary-200 hover:border-primary-300"
+                    href="/orders"
+                    className="block p-4 rounded-md border border-primary-200 hover:border-primary-300 transition-colors"
                   >
-                    <h3 className="font-medium">Order History</h3>
-                    <p className="text-sm mt-1">View your past orders</p>
+                    <h3 className="text-lg font-medium text-primary-900">Order History</h3>
+                    <p className="text-primary-600 text-sm mt-1">View your past orders</p>
                   </Link>
                   <Link
-                    href="/profile/wishlist"
-                    className="block text-primary-600 hover:text-primary-900 transition-colors p-4 rounded-md border border-primary-200 hover:border-primary-300"
+                    href="/wishlist"
+                    className="block p-4 rounded-md border border-primary-200 hover:border-primary-300 transition-colors"
                   >
-                    <h3 className="font-medium">Wishlist</h3>
-                    <p className="text-sm mt-1">View your saved items</p>
+                    <h3 className="text-lg font-medium text-primary-900">Wishlist</h3>
+                    <p className="text-primary-600 text-sm mt-1">View your saved items</p>
                   </Link>
                   <Link
                     href="/profile/settings/payment"
-                    className="block text-primary-600 hover:text-primary-900 transition-colors p-4 rounded-md border border-primary-200 hover:border-primary-300"
+                    className="block p-4 rounded-md border border-primary-200 hover:border-primary-300 transition-colors"
                   >
-                    <h3 className="font-medium">Payment Methods</h3>
-                    <p className="text-sm mt-1">Manage your payment options</p>
+                    <h3 className="text-lg font-medium text-primary-900">Payment Methods</h3>
+                    <p className="text-primary-600 text-sm mt-1">Manage your payment options</p>
                   </Link>
                   <Link
                     href="/profile/settings/addresses"
-                    className="block text-primary-600 hover:text-primary-900 transition-colors p-4 rounded-md border border-primary-200 hover:border-primary-300"
+                    className="block p-4 rounded-md border border-primary-200 hover:border-primary-300 transition-colors"
                   >
-                    <h3 className="font-medium">Addresses</h3>
-                    <p className="text-sm mt-1">Manage your shipping addresses</p>
+                    <h3 className="text-lg font-medium text-primary-900">Addresses</h3>
+                    <p className="text-primary-600 text-sm mt-1">Manage your shipping addresses</p>
                   </Link>
                 </div>
-              </div>
+              </section>
             </div>
           </div>
         </div>
